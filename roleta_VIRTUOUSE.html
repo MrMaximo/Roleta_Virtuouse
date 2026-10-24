@@ -235,12 +235,14 @@
             position: relative;
             background: var(--white-off);
             color: var(--brown-deep);
-            padding: 44px 40px;
+            padding: 36px 36px;
             border-radius: 24px;
             border: 2px solid var(--gold-accent);
             text-align: center;
             width: 90%;
             max-width: 560px;
+            max-height: 92vh;
+            overflow-y: auto;
             box-shadow: 0 25px 60px rgba(0,0,0,0.45);
             animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 101;
@@ -253,17 +255,17 @@
 
         .modal .pill-badge {
             display: inline-block;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .modal h2 {
             font-family: 'Cormorant Garamond', Georgia, serif;
-            font-size: 2.3rem;
+            font-size: 2.2rem;
             font-weight: 600;
             letter-spacing: 3px;
             text-transform: uppercase;
             color: var(--brown-deep);
-            margin-bottom: 22px;
+            margin-bottom: 20px;
         }
 
         .prize-box {
@@ -297,8 +299,8 @@
         .qty-list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            margin-bottom: 24px;
+            gap: 10px;
+            margin-bottom: 22px;
             text-align: left;
         }
 
@@ -307,7 +309,7 @@
             align-items: center;
             justify-content: space-between;
             background: #F3EFEA;
-            padding: 12px 18px;
+            padding: 10px 18px;
             border-radius: 12px;
             border: 1px solid #DFD5C8;
         }
@@ -317,7 +319,7 @@
             align-items: center;
             gap: 12px;
             font-weight: 500;
-            font-size: 1rem;
+            font-size: 0.98rem;
             color: var(--brown-deep);
             letter-spacing: 1px;
         }
@@ -331,7 +333,7 @@
         }
 
         .qty-select {
-            padding: 8px 16px;
+            padding: 7px 16px;
             border-radius: 8px;
             border: 1px solid var(--taupe-logo);
             background: var(--white-off);
@@ -424,15 +426,17 @@
     </div>
 
 <script>
-    // Configuração padrão inicial dos 5 tipos de prêmios
+    // Configuração padrão inicial dos 6 tipos de prêmios (incluindo Home Spray com qtd 1)
     const premiosBase = [
         { id: "porta_joias", nome: "PORTA JÓIAS",        qtdPadrao: 1, cor: "#5A3C28", texto: "#FAF8F5" },
         { id: "escova",      nome: "ESCOVA DE CABELO",   qtdPadrao: 1, cor: "#C5A368", texto: "#FAF8F5" },
         { id: "acessorio",   nome: "ACESSÓRIO SURPRESA", qtdPadrao: 1, cor: "#7A5843", texto: "#FAF8F5" },
+        { id: "home_spray",  nome: "HOME SPRAY",         qtdPadrao: 1, cor: "#8C6D53", texto: "#FAF8F5" },
         { id: "desconto",    nome: "5% OFF",             qtdPadrao: 7, cor: "#DFD5C8", texto: "#5A3C28" },
-        { id: "pao_de_mel",  nome: "+1 PÃO DE MEL",      qtdPadrao: 5, cor: "#A68E74", texto: "#FAF8F5" }
+        { id: "pao_de_mel",  nome: "+1 PÃO DE MEL",      qtdPadrao: 7, cor: "#A68E74", texto: "#FAF8F5" }
     ];
 
+    const STORAGE_KEY = 'virtuouse_quantidades_v2';
     let quantidadesAtuais = {};
     let fatias = [];
 
@@ -457,10 +461,13 @@
 
     // Inicializa quantidades
     function inicializarQuantidades() {
-        const salvo = localStorage.getItem('virtuouse_quantidades');
+        const salvo = localStorage.getItem(STORAGE_KEY);
         if (salvo) {
             try {
-                quantidadesAtuais = JSON.parse(salvo);
+                const parsed = JSON.parse(salvo);
+                premiosBase.forEach(item => {
+                    quantidadesAtuais[item.id] = parsed[item.id] !== undefined ? parsed[item.id] : item.qtdPadrao;
+                });
             } catch (e) {
                 definirPadrao();
             }
@@ -476,7 +483,7 @@
         });
     }
 
-    // Constrói e embaralha as fatias de forma inteligente para que nunca fiquem viciadas na mesma posição
+    // Constrói e embaralha as fatias de forma inteligente
     function construirFatias() {
         let grupos = premiosBase.map(item => ({
             ...item,
@@ -488,7 +495,6 @@
         let ultimoId = null;
 
         for (let i = 0; i < total; i++) {
-            // Embaralha grupos com quantidades parecidas para variar a distribuição a cada sessão
             grupos.sort((a, b) => (b.restante - a.restante) || (numeroAleatorioReal() - 0.5));
 
             let candidatos = grupos.filter(g => g.restante > 0 && g.id !== ultimoId);
@@ -496,7 +502,6 @@
                 candidatos = grupos.filter(g => g.restante > 0);
             }
 
-            // Peso maior para o maior grupo não acumular no final, mas com escolha aleatória entre candidatos
             let escolhido;
             if (candidatos[0].restante > Math.ceil((total - i) / 2)) {
                 escolhido = candidatos[0];
@@ -523,7 +528,6 @@
             ultimoId = escolhido.id;
         }
 
-        // Rotaciona a lista de fatias aleatoriamente ao iniciar
         if (resultado.length > 1) {
             const deslocamento = inteiroAleatorio(0, resultado.length - 1);
             resultado = resultado.slice(deslocamento).concat(resultado.slice(0, deslocamento));
@@ -604,7 +608,7 @@
         const numFatias = fatias.length;
         const anguloGraus = 360 / numFatias;
 
-        // 1. Sorteia a duração aleatória entre 5.0 e 12.0 segundos (em milissegundos)
+        // 1. Sorteia a duração aleatória entre 5.0 e 12.0 segundos
         const duracaoMs = inteiroAleatorio(5000, 12000);
         const duracaoSegundos = (duracaoMs / 1000).toFixed(2);
 
@@ -618,7 +622,7 @@
         let diferenca = alvoNoCirculo - modAtual;
         if (diferenca < 0) diferenca += 360;
 
-        // 3. Quantidade de voltas proporcional ao tempo sorteado (entre 6 e 16 voltas)
+        // 3. Quantidade de voltas proporcional ao tempo sorteado
         const numVoltas = Math.round(duracaoMs / 750) + inteiroAleatorio(0, 2);
         rotacaoAtual += (numVoltas * 360) + diferenca;
 
@@ -691,7 +695,7 @@
         }
 
         quantidadesAtuais = novasQuantidades;
-        localStorage.setItem('virtuouse_quantidades', JSON.stringify(quantidadesAtuais));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(quantidadesAtuais));
         construirFatias();
         fecharConfiguracoes();
     }
