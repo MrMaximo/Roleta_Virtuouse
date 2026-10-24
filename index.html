@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Roleta Virtuouse Acessórios</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-cream: #EAE3DC;
@@ -235,12 +235,12 @@
             position: relative;
             background: var(--white-off);
             color: var(--brown-deep);
-            padding: 36px 36px;
+            padding: 36px 40px;
             border-radius: 24px;
             border: 2px solid var(--gold-accent);
             text-align: center;
-            width: 90%;
-            max-width: 560px;
+            width: 92%;
+            max-width: 780px;
             max-height: 92vh;
             overflow-y: auto;
             box-shadow: 0 25px 60px rgba(0,0,0,0.45);
@@ -248,9 +248,66 @@
             z-index: 101;
         }
 
+        .modal-settings {
+            max-width: 560px;
+        }
+
         @keyframes popIn {
             from { transform: scale(0.7); opacity: 0; }
             to { transform: scale(1); opacity: 1; }
+        }
+
+        /* Layout horizontal na tela de resultado (Prêmio à esquerda | QR Code à direita) */
+        .result-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 32px;
+        }
+
+        .result-left {
+            flex: 1.25;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .result-right {
+            flex: 0.85;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #FFFFFF;
+            padding: 20px 18px;
+            border-radius: 18px;
+            border: 1px solid #E5DDD5;
+            box-shadow: 0 8px 22px rgba(90, 60, 40, 0.08);
+        }
+
+        .qr-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--brown-medium);
+            margin-bottom: 10px;
+        }
+
+        .qr-frame {
+            width: 210px;
+            height: 230px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .qr-frame img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
         }
 
         .modal .pill-badge {
@@ -265,19 +322,20 @@
             letter-spacing: 3px;
             text-transform: uppercase;
             color: var(--brown-deep);
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .prize-box {
-            padding: 30px 24px;
+            width: 100%;
+            padding: 28px 20px;
             border-radius: 14px;
             border: 1px solid var(--gold-accent);
             font-family: 'Cormorant Garamond', Georgia, serif;
-            font-size: 2.5rem;
+            font-size: 2.3rem;
             font-weight: 700;
             letter-spacing: 3px;
             text-transform: uppercase;
-            margin-bottom: 30px;
+            margin-bottom: 26px;
             box-shadow: inset 0 0 20px rgba(0,0,0,0.08);
         }
 
@@ -400,20 +458,33 @@
         </div>
     </div>
 
-    <!-- Cena de Explosão de Confetes e Resultado -->
+    <!-- Cena de Explosão de Confetes, Resultado e QR Code Local -->
     <div id="overlay">
         <canvas id="confetti"></canvas>
         <div class="modal">
-            <div class="pill-badge">parabéns pelo seu mimo</div>
-            <h2>VOCÊ GANHOU:</h2>
-            <div id="prizeBox" class="prize-box">PORTA JÓIAS</div>
-            <button class="close-btn" onclick="fecharModal()">NOVO GIRO</button>
+            <div class="result-content">
+                <!-- Coluna Esquerda: Prêmio Sorteado -->
+                <div class="result-left">
+                    <div class="pill-badge">parabéns pelo seu mimo</div>
+                    <h2>VOCÊ GANHOU:</h2>
+                    <div id="prizeBox" class="prize-box">PORTA JÓIAS</div>
+                    <button class="close-btn" onclick="fecharModal()">NOVO GIRO</button>
+                </div>
+
+                <!-- Coluna Direita: Imagem Local do QR Code (qrcode.png) -->
+                <div class="result-right">
+                    <div class="qr-title">Siga nosso Instagram</div>
+                    <div class="qr-frame">
+                        <img src="qrcode.png" alt="QR Code Instagram @virtuouse_">
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Modal de Configuração de Quantidades (0 a 20) -->
     <div id="settingsOverlay">
-        <div class="modal">
+        <div class="modal modal-settings">
             <div class="pill-badge">configuração</div>
             <h2>QUANTIDADES NA ROLETA</h2>
             <div id="qtyList" class="qty-list"></div>
@@ -426,12 +497,12 @@
     </div>
 
 <script>
-    // Configuração padrão inicial dos 6 tipos de prêmios (incluindo Home Spray com qtd 1)
+    // Configuração padrão inicial dos 6 tipos de prêmios
     const premiosBase = [
-        { id: "porta_joias", nome: "PORTA JÓIAS",        qtdPadrao: 1, cor: "#5A3C28", texto: "#FAF8F5" },
-        { id: "escova",      nome: "ESCOVA DE CABELO",   qtdPadrao: 1, cor: "#C5A368", texto: "#FAF8F5" },
-        { id: "acessorio",   nome: "ACESSÓRIO SURPRESA", qtdPadrao: 1, cor: "#7A5843", texto: "#FAF8F5" },
-        { id: "home_spray",  nome: "HOME SPRAY",         qtdPadrao: 1, cor: "#8C6D53", texto: "#FAF8F5" },
+        { id: "porta_joias", nome: "PORTA JÓIAS",        qtdPadrao: 2, cor: "#5A3C28", texto: "#FAF8F5" },
+        { id: "escova",      nome: "ESCOVA DE CABELO",   qtdPadrao: 2, cor: "#C5A368", texto: "#FAF8F5" },
+        { id: "acessorio",   nome: "ACESSÓRIO SURPRESA", qtdPadrao: 2, cor: "#7A5843", texto: "#FAF8F5" },
+        { id: "home_spray",  nome: "HOME SPRAY",         qtdPadrao: 2, cor: "#8C6D53", texto: "#FAF8F5" },
         { id: "desconto",    nome: "5% OFF",             qtdPadrao: 7, cor: "#DFD5C8", texto: "#5A3C28" },
         { id: "pao_de_mel",  nome: "+1 PÃO DE MEL",      qtdPadrao: 7, cor: "#A68E74", texto: "#FAF8F5" }
     ];
@@ -459,7 +530,6 @@
         return Math.floor(numeroAleatorioReal() * (max - min + 1)) + min;
     }
 
-    // Inicializa quantidades
     function inicializarQuantidades() {
         const salvo = localStorage.getItem(STORAGE_KEY);
         if (salvo) {
@@ -483,7 +553,6 @@
         });
     }
 
-    // Constrói e embaralha as fatias de forma inteligente
     function construirFatias() {
         let grupos = premiosBase.map(item => ({
             ...item,
