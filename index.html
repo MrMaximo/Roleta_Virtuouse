@@ -57,12 +57,13 @@
                 0 20px 45px rgba(90, 60, 40, 0.28);
         }
 
-        /* Ponteiro superior */
+        /* Ponteiro superior com animação de impacto do pino */
         .pointer {
             position: absolute;
             top: -20px;
             left: 50%;
             transform: translateX(-50%);
+            transform-origin: 50% 0%;
             width: 0;
             height: 0;
             border-left: 18px solid transparent;
@@ -70,6 +71,7 @@
             border-top: 42px solid var(--brown-deep);
             filter: drop-shadow(0 4px 6px rgba(0,0,0,0.25));
             z-index: 10;
+            transition: transform 0.05s ease-out;
         }
         .pointer::after {
             content: '';
@@ -79,6 +81,9 @@
             border-left: 14px solid transparent;
             border-right: 14px solid transparent;
             border-top: 34px solid var(--gold-accent);
+        }
+        .pointer.tick {
+            transform: translateX(-50%) rotate(-14deg);
         }
 
         /* LADO DIREITO: Identidade Visual e Controles */
@@ -189,8 +194,10 @@
 
         .utility-bar {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             margin-top: 22px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .util-btn {
@@ -198,9 +205,9 @@
             color: var(--brown-medium);
             border: 1px solid rgba(90, 60, 40, 0.3);
             border-radius: 20px;
-            padding: 8px 18px;
+            padding: 8px 16px;
             font-family: 'Montserrat', sans-serif;
-            font-size: 0.78rem;
+            font-size: 0.75rem;
             letter-spacing: 1px;
             cursor: pointer;
             text-transform: uppercase;
@@ -257,7 +264,7 @@
             to { transform: scale(1); opacity: 1; }
         }
 
-        /* Layout horizontal na tela de resultado (Prêmio à esquerda | QR Code à direita) */
+        /* Layout horizontal na tela de resultado */
         .result-content {
             display: flex;
             align-items: center;
@@ -435,7 +442,7 @@
 
     <!-- Lado Esquerdo: A Roleta -->
     <div class="wheel-container">
-        <div class="pointer"></div>
+        <div id="pointer" class="pointer"></div>
         <canvas id="wheel" width="900" height="900"></canvas>
     </div>
 
@@ -454,6 +461,7 @@
 
         <div class="utility-bar">
             <button class="util-btn" onclick="ativarTelaCheia()">⛶ Tela Cheia</button>
+            <button class="util-btn" id="soundBtn" onclick="alternarSom()">🔊 Som</button>
             <button class="util-btn" onclick="abrirConfiguracoes()">⚙️ Quantidades</button>
         </div>
     </div>
@@ -499,12 +507,12 @@
 <script>
     // Configuração padrão inicial dos 6 tipos de prêmios
     const premiosBase = [
-        { id: "porta_joias", nome: "PORTA JÓIAS",        qtdPadrao: 2, cor: "#5A3C28", texto: "#FAF8F5" },
-        { id: "escova",      nome: "ESCOVA DE CABELO",   qtdPadrao: 2, cor: "#C5A368", texto: "#FAF8F5" },
-        { id: "acessorio",   nome: "ACESSÓRIO SURPRESA", qtdPadrao: 2, cor: "#7A5843", texto: "#FAF8F5" },
-        { id: "home_spray",  nome: "HOME SPRAY",         qtdPadrao: 2, cor: "#8C6D53", texto: "#FAF8F5" },
+        { id: "porta_joias", nome: "PORTA JÓIAS",        qtdPadrao: 1, cor: "#5A3C28", texto: "#FAF8F5" },
+        { id: "escova",      nome: "ESCOVA DE CABELO",   qtdPadrao: 1, cor: "#C5A368", texto: "#FAF8F5" },
+        { id: "acessorio",   nome: "ACESSÓRIO SURPRESA", qtdPadrao: 1, cor: "#7A5843", texto: "#FAF8F5" },
+        { id: "home_spray",  nome: "HOME SPRAY",         qtdPadrao: 1, cor: "#8C6D53", texto: "#FAF8F5" },
         { id: "desconto",    nome: "5% OFF",             qtdPadrao: 7, cor: "#DFD5C8", texto: "#5A3C28" },
-        { id: "pao_de_mel",  nome: "+1 PÃO DE MEL",      qtdPadrao: 7, cor: "#A68E74", texto: "#FAF8F5" }
+        { id: "pao_de_mel",  nome: "+1 PÃO DE MEL",      qtdPadrao: 5, cor: "#A68E74", texto: "#FAF8F5" }
     ];
 
     const STORAGE_KEY = 'virtuouse_quantidades_v2';
@@ -512,9 +520,102 @@
     let fatias = [];
 
     const wheelCanvas = document.getElementById('wheel');
+    const pointerEl = document.getElementById('pointer');
     const ctx = wheelCanvas.getContext('2d');
     let rotacaoAtual = 0;
     let girando = false;
+
+    // ==================== MOTOR DE ÁUDIO NATIVO (WEB AUDIO API) ====================
+    let audioCtx = null;
+    let somAtivo = true;
+
+    function inicializarAudio() {
+        if (!audioCtx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) {
+                audioCtx = new AudioContextClass();
+            }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    function alternarSom() {
+        somAtivo = !somAtivo;
+        document.getElementById('soundBtn').innerText = somAtivo ? '🔊 Som' : '🔇 Mudo';
+    }
+
+    // Som mecânico de "Clec" quando cada pino da fatia passa pelo ponteiro
+    function tocarClec() {
+        if (!somAtivo || !audioCtx) return;
+        const agora = audioCtx.currentTime;
+
+        // Oscilador percussivo curto imitando plástico/madeira batendo no pino
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1150, agora);
+        osc.frequency.exponentialRampToValueAtTime(190, agora + 0.028);
+
+        gain.gain.setValueAtTime(0.38, agora);
+        gain.gain.exponentialRampToValueAtTime(0.001, agora + 0.028);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(agora);
+        osc.stop(agora + 0.03);
+
+        // Animação rápida do ponteiro dobrando ao bater no pino
+        pointerEl.classList.add('tick');
+        setTimeout(() => pointerEl.classList.remove('tick'), 45);
+    }
+
+    // Fanfarra alegre estilo conclusão de lição do Duolingo
+    function tocarSomVitoriaDuolingo() {
+        if (!somAtivo || !audioCtx) return;
+        const agora = audioCtx.currentTime;
+
+        // Arpejo ascendente alegre (Sol4, Si4, Ré5, Sol5) com timbre brilhante
+        const notas = [
+            { freq: 587.33, inicio: 0.00, duracao: 0.11, vol: 0.25 }, // D5
+            { freq: 740.00, inicio: 0.10, duracao: 0.11, vol: 0.28 }, // F#5
+            { freq: 880.00, inicio: 0.20, duracao: 0.12, vol: 0.30 }, // A5
+            { freq: 1174.66, inicio: 0.31, duracao: 0.65, vol: 0.38 } // D6 (sustentada brilhante)
+        ];
+
+        notas.forEach(n => {
+            const oscPrincipal = audioCtx.createOscillator();
+            const oscHarmonico = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            oscPrincipal.type = 'triangle';
+            oscHarmonico.type = 'sine';
+
+            oscPrincipal.frequency.setValueAtTime(n.freq, agora + n.inicio);
+            oscHarmonico.frequency.setValueAtTime(n.freq * 2, agora + n.inicio); // Brilho oitavado
+
+            gain.gain.setValueAtTime(0.001, agora + n.inicio);
+            gain.gain.linearRampToValueAtTime(n.vol, agora + n.inicio + 0.018);
+            gain.gain.exponentialRampToValueAtTime(0.0008, agora + n.inicio + n.duracao);
+
+            const gainHarm = audioCtx.createGain();
+            gainHarm.gain.value = 0.25;
+
+            oscPrincipal.connect(gain);
+            oscHarmonico.connect(gainHarm);
+            gainHarm.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            oscPrincipal.start(agora + n.inicio);
+            oscHarmonico.start(agora + n.inicio);
+            oscPrincipal.stop(agora + n.inicio + n.duracao + 0.02);
+            oscHarmonico.stop(agora + n.inicio + n.duracao + 0.02);
+        });
+    }
+    // ===============================================================================
 
     // Gerador de números verdadeiramente aleatórios (Criptográfico)
     function numeroAleatorioReal() {
@@ -646,6 +747,20 @@
             ctx.restore();
         });
 
+        // Pinos dourados na borda de cada divisória de fatia
+        fatias.forEach((_, i) => {
+            const angulo = i * anguloFatia;
+            const px = cx + Math.cos(angulo) * (raio - 8);
+            const py = cy + Math.sin(angulo) * (raio - 8);
+            ctx.beginPath();
+            ctx.arc(px, py, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = "#FAF8F5";
+            ctx.fill();
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = "#5A3C28";
+            ctx.stroke();
+        });
+
         // Centro da roleta com inicial "V"
         ctx.beginPath();
         ctx.arc(cx, cy, 58, 0, 2 * Math.PI);
@@ -667,8 +782,34 @@
         ctx.fillText("V", cx, cy + 2);
     }
 
+    // Curva Cubic Bezier idêntica a cubic-bezier(0.12, 0.85, 0.20, 1) para rastrear o "clec-clec" quadro a quadro
+    function cubicBezier(t, p1x, p1y, p2x, p2y) {
+        const cx = 3 * p1x;
+        const bx = 3 * (p2x - p1x) - cx;
+        const ax = 1 - cx - bx;
+        const cy = 3 * p1y;
+        const by = 3 * (p2y - p1y) - cy;
+        const ay = 1 - cy - by;
+
+        function sampleCurveX(t) { return ((ax * t + bx) * t + cx) * t; }
+        function sampleCurveY(t) { return ((ay * t + by) * t + cy) * t; }
+        function sampleCurveDerivativeX(t) { return (3 * ax * t + 2 * bx) * t + cx; }
+
+        let t2 = t;
+        for (let i = 0; i < 8; i++) {
+            let x2 = sampleCurveX(t2) - t;
+            if (Math.abs(x2) < 1e-6) break;
+            let d2 = sampleCurveDerivativeX(t2);
+            if (Math.abs(d2) < 1e-6) break;
+            t2 = t2 - x2 / d2;
+        }
+        return sampleCurveY(t2);
+    }
+
     function girarRoleta() {
         if (girando || fatias.length === 0) return;
+        inicializarAudio();
+
         girando = true;
         const btn = document.getElementById('spinBtn');
         btn.disabled = true;
@@ -679,7 +820,6 @@
 
         // 1. Sorteia a duração aleatória entre 5.0 e 12.0 segundos
         const duracaoMs = inteiroAleatorio(5000, 12000);
-        const duracaoSegundos = (duracaoMs / 1000).toFixed(2);
 
         // 2. Sorteia a fatia vencedora com entropia criptográfica
         const indiceSorteado = inteiroAleatorio(0, numFatias - 1);
@@ -687,24 +827,48 @@
         const variacao = (numeroAleatorioReal() - 0.5) * (anguloGraus * 0.65);
 
         const alvoNoCirculo = (270 - centroFatia + variacao + 360) % 360;
-        const modAtual = rotacaoAtual % 360;
+        const rotacaoInicial = rotacaoAtual;
+        const modAtual = rotacaoInicial % 360;
         let diferenca = alvoNoCirculo - modAtual;
         if (diferenca < 0) diferenca += 360;
 
         // 3. Quantidade de voltas proporcional ao tempo sorteado
         const numVoltas = Math.round(duracaoMs / 750) + inteiroAleatorio(0, 2);
-        rotacaoAtual += (numVoltas * 360) + diferenca;
+        const deltaTotal = (numVoltas * 360) + diferenca;
+        const rotacaoFinal = rotacaoInicial + deltaTotal;
+        rotacaoAtual = rotacaoFinal;
 
-        // 4. Aplica a transição dinâmica conforme o tempo sorteado nesta rodada
-        wheelCanvas.style.transition = `transform ${duracaoSegundos}s cubic-bezier(0.12, 0.85, 0.20, 1)`;
-        wheelCanvas.style.transform = `rotate(${rotacaoAtual}deg)`;
+        const inicioTempo = performance.now();
+        let ultimoIndiceFatiaPonteiro = Math.floor(((270 - (rotacaoInicial % 360) + 360) % 360) / anguloGraus);
 
-        setTimeout(() => {
-            girando = false;
-            btn.disabled = false;
-            btn.innerText = "GIRAR ROLETA";
-            mostrarPremio(fatias[indiceSorteado]);
-        }, duracaoMs);
+        function animarGiro(agora) {
+            const decorrido = agora - inicioTempo;
+            const t = Math.min(decorrido / duracaoMs, 1);
+            const progressoCurva = cubicBezier(t, 0.12, 0.85, 0.20, 1.0);
+
+            const anguloCorrente = rotacaoInicial + (deltaTotal * progressoCurva);
+            wheelCanvas.style.transform = `rotate(${anguloCorrente}deg)`;
+
+            // Verifica qual fatia está passando pelo ponteiro (270 graus) para disparar o "clec"
+            const anguloNoPonteiro = (270 - (anguloCorrente % 360) + 360) % 360;
+            const indiceFatiaAtual = Math.floor(anguloNoPonteiro / anguloGraus);
+
+            if (indiceFatiaAtual !== ultimoIndiceFatiaPonteiro) {
+                tocarClec();
+                ultimoIndiceFatiaPonteiro = indiceFatiaAtual;
+            }
+
+            if (t < 1) {
+                requestAnimationFrame(animarGiro);
+            } else {
+                girando = false;
+                btn.disabled = false;
+                btn.innerText = "GIRAR ROLETA";
+                mostrarPremio(fatias[indiceSorteado]);
+            }
+        }
+
+        requestAnimationFrame(animarGiro);
     }
 
     // Painel de Configuração de Quantidades (0 a 20)
@@ -769,9 +933,10 @@
         fecharConfiguracoes();
     }
 
-    // Explosão de Confetes e Modal do Vencedor
+    // Explosão de Confetes, Som de Vitória e Modal do Vencedor
     let animConfeteId;
     function mostrarPremio(vencedor) {
+        tocarSomVitoriaDuolingo();
         const prizeBox = document.getElementById('prizeBox');
         prizeBox.innerText = vencedor.nome;
         prizeBox.style.backgroundColor = vencedor.cor;
